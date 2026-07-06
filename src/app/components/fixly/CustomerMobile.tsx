@@ -1,24 +1,33 @@
 import { useState, useEffect } from "react";
 import {
-  Search, MapPin, Bell, ChevronLeft, ChevronRight, Headphones, Tag, Calendar,
+  Search, MapPin, Bell, ChevronLeft, Headphones, Tag, Calendar,
   CreditCard, ShieldCheck, Phone, MessageCircle, X, Star, Camera, CheckCircle2,
   Home, ClipboardList, User, AlertCircle, Plus, ChevronDown, Apple, Clock,
-  Sun, Moon, Settings as SettingsIcon, Download, Share2,
+  Sun, Moon, Settings as SettingsIcon, Download, Share2, Video, Flag, Gift,
+  BadgeCheck, Award, Wallet, WifiOff, MoreVertical, FileText,
+  PlayCircle, RefreshCw,
 } from "lucide-react";
 import {
   PhoneFrame, SERVICES, ServiceIcon, PriceBadge, TopBar, StatusBadge, Stars,
   PrimaryButton, MapMock, Avatar, Card, Section, GuaranteePill, StepIndicator,
-  LOGO, FullCTA, InlineRow, ConfirmDialog, FaqAccordion, notify, soon,
+  FullCTA, InlineRow, ConfirmDialog, FaqAccordion, notify, soon,
 } from "./shared";
+
+// Launch (bookable) vs coming-soon
+const LAUNCH_IDS = ["elec", "plumb", "ac"] as const;
+const isLaunch = (id: string) => (LAUNCH_IDS as readonly string[]).includes(id);
+const CREDIT_BALANCE = 20; // service-credit wallet balance (دينار)
 
 type Screen =
   | "splash" | "onboarding" | "phone" | "otp" | "permissions"
   | "home" | "service" | "time" | "location" | "payment" | "review" | "searching"
-  | "tracking" | "cancel" | "in-progress" | "approve-work" | "completed" | "rate"
+  | "assigned" | "tracking" | "reviews" | "report" | "cancel" | "arrived"
+  | "in-progress" | "approve-work" | "completed" | "rate"
   | "bookings" | "booking-detail" | "guarantee" | "guarantee-new" | "guarantee-ticket"
   | "profile" | "edit-profile" | "addresses" | "payment-methods" | "notifications" | "support" | "settings"
   | "settings-language" | "settings-notifications-pref" | "settings-appearance"
-  | "no-techs";
+  | "protection" | "wallet" | "video-quotes" | "video-new" | "referral"
+  | "no-techs" | "payment-failed" | "offline" | "location-denied";
 
 const TABS = [
   { id: "home" as Screen, ar: "الرئيسية", Icon: Home },
@@ -33,6 +42,8 @@ export default function CustomerMobile() {
   const [bookingStep, setBookingStep] = useState(0);
   const [otp, setOtp] = useState("");
   const [resendTimer, setResendTimer] = useState(45);
+  const [member, setMember] = useState(false); // Protection Plan membership
+  const [renewDate] = useState("08/07/2026");
 
   useEffect(() => {
     if (screen === "otp" && resendTimer > 0) {
@@ -49,18 +60,22 @@ export default function CustomerMobile() {
       <div className="h-full overflow-hidden" style={{ background: "#F6F8FB" }}>
         {screen === "splash" && <Splash onContinue={() => go("onboarding")} />}
         {screen === "onboarding" && <Onboarding onDone={() => go("phone")} />}
-        {screen === "phone" && <PhoneEntry onSubmit={() => { setResendTimer(45); go("otp"); }} />}
+        {screen === "phone" && <PhoneEntry onSubmit={() => { setResendTimer(45); go("otp"); }} onBack={() => go("onboarding")} />}
         {screen === "otp" && <OtpVerify otp={otp} setOtp={setOtp} resendTimer={resendTimer} onDone={() => go("permissions")} onBack={() => go("phone")} onResend={() => { setResendTimer(45); notify("تم إرسال رمز جديد عبر واتساب", "success"); }} />}
         {screen === "permissions" && <Permissions onDone={() => go("home")} />}
 
-        {screen === "home" && <HomeScreen onPickService={(s) => { setSelectedService(s); go("service"); }} onTracking={() => go("tracking")} onNotifications={() => go("notifications")} onSupport={() => go("support")} />}
-        {screen === "service" && <ServiceDetail svc={selectedService} onBack={() => go("home")} onBook={() => { setBookingStep(0); go("time"); }} />}
+        {screen === "home" && <HomeScreen member={member} onPickService={(s) => { setSelectedService(s); go("service"); }} onTracking={() => go("tracking")} onNotifications={() => go("notifications")} onSupport={() => go("support")} onProtection={() => go("protection")} onWallet={() => go("wallet")} onVideo={() => go("video-quotes")} onOffline={() => go("offline")} />}
+        {screen === "service" && <ServiceDetail svc={selectedService} onBack={() => go("home")} onBook={() => { setBookingStep(0); go("time"); }} onVideo={() => go("video-quotes")} />}
         {screen === "time" && <TimeStep onBack={() => go("service")} onNext={() => { setBookingStep(1); go("location"); }} />}
-        {screen === "location" && <LocationStep onBack={() => go("time")} onNext={() => { setBookingStep(2); go("payment"); }} />}
+        {screen === "location" && <LocationStep onBack={() => go("time")} onNext={() => { setBookingStep(2); go("payment"); }} onDenied={() => go("location-denied")} />}
         {screen === "payment" && <PaymentStep onBack={() => go("location")} onNext={() => { setBookingStep(3); go("review"); }} />}
-        {screen === "review" && <ReviewStep svc={selectedService} onBack={() => go("payment")} onConfirm={() => go("searching")} />}
-        {screen === "searching" && <Searching onAssign={() => go("tracking")} onCancel={() => go("home")} onNoTechs={() => go("no-techs")} />}
-        {screen === "tracking" && <LiveTracking svc={selectedService} onCancel={() => go("cancel")} onInProgress={() => go("in-progress")} onBack={() => go("home")} onApprove={() => go("approve-work")} />}
+        {screen === "review" && <ReviewStep svc={selectedService} member={member} onBack={() => go("payment")} onConfirm={() => go("searching")} onFail={() => go("payment-failed")} />}
+        {screen === "searching" && <Searching onAssign={() => go("assigned")} onCancel={() => go("home")} onNoTechs={() => go("no-techs")} />}
+        {screen === "assigned" && <TechnicianAssigned svc={selectedService} onTrack={() => go("tracking")} onReviews={() => go("reviews")} onCancel={() => go("cancel")} />}
+        {screen === "tracking" && <LiveTracking svc={selectedService} onCancel={() => go("cancel")} onArrived={() => go("arrived")} onInProgress={() => go("in-progress")} onBack={() => go("home")} onReport={() => go("report")} onReviews={() => go("reviews")} />}
+        {screen === "reviews" && <TechnicianReviews onBack={() => go("tracking")} />}
+        {screen === "report" && <ReportTechnician onBack={() => go("tracking")} onDone={() => go("tracking")} />}
+        {screen === "arrived" && <Arrived onInProgress={() => go("in-progress")} onWallet={() => go("wallet")} onBack={() => go("tracking")} />}
         {screen === "cancel" && <CancelFlow onBack={() => go("tracking")} onDone={() => go("home")} />}
         {screen === "in-progress" && <InProgress onApprove={() => go("approve-work")} onDone={() => go("completed")} />}
         {screen === "approve-work" && <ApproveWork onBack={() => go("in-progress")} onApproved={() => go("in-progress")} />}
@@ -69,22 +84,31 @@ export default function CustomerMobile() {
 
         {screen === "bookings" && <Bookings onOpen={() => go("booking-detail")} />}
         {screen === "booking-detail" && <BookingDetail onBack={() => go("bookings")} />}
-        {screen === "guarantee" && <GuaranteeHome onNew={() => go("guarantee-new")} onTicket={() => go("guarantee-ticket")} />}
+        {screen === "guarantee" && <GuaranteeHome member={member} onNew={() => go("guarantee-new")} onTicket={() => go("guarantee-ticket")} />}
         {screen === "guarantee-new" && <GuaranteeNew onBack={() => go("guarantee")} onDone={() => go("guarantee-ticket")} />}
         {screen === "guarantee-ticket" && <GuaranteeTicket onBack={() => go("guarantee")} />}
 
-        {screen === "profile" && <Profile onAddresses={() => go("addresses")} onPayments={() => go("payment-methods")} onNotifs={() => go("notifications")} onSupport={() => go("support")} onSettings={() => go("settings")} onEditProfile={() => go("edit-profile")} />}
+        {screen === "profile" && <Profile member={member} onAddresses={() => go("addresses")} onPayments={() => go("payment-methods")} onNotifs={() => go("notifications")} onSupport={() => go("support")} onSettings={() => go("settings")} onEditProfile={() => go("edit-profile")} onProtection={() => go("protection")} onWallet={() => go("wallet")} onVideo={() => go("video-quotes")} onReferral={() => go("referral")} />}
         {screen === "edit-profile" && <EditProfile onBack={() => go("profile")} />}
         {screen === "addresses" && <Addresses onBack={() => go("profile")} />}
         {screen === "payment-methods" && <PaymentMethods onBack={() => go("profile")} />}
         {screen === "notifications" && <Notifications onBack={() => go("profile")} />}
-        {screen === "support" && <Support onBack={() => go("profile")} />}
+        {screen === "support" && <Support member={member} onBack={() => go("profile")} />}
         {screen === "settings" && <Settings onBack={() => go("profile")} onLanguage={() => go("settings-language")} onNotifPref={() => go("settings-notifications-pref")} onAppearance={() => go("settings-appearance")} onLogout={() => go("splash")} />}
         {screen === "settings-language" && <SettingsLanguage onBack={() => go("settings")} />}
         {screen === "settings-notifications-pref" && <SettingsNotificationsPref onBack={() => go("settings")} />}
         {screen === "settings-appearance" && <SettingsAppearance onBack={() => go("settings")} />}
 
-        {screen === "no-techs" && <NoTechs onRetry={() => go("home")} />}
+        {screen === "protection" && <ProtectionPlan member={member} renewDate={renewDate} onBack={() => go("profile")} onSubscribe={() => { setMember(true); notify("تم تفعيل خطة الحماية", "success"); }} onCancel={() => { setMember(false); notify("سيتم إلغاء الاشتراك في نهاية الفترة"); }} />}
+        {screen === "wallet" && <WalletScreen onBack={() => go("profile")} />}
+        {screen === "video-quotes" && <VideoQuotes onBack={() => go("home")} onNew={() => go("video-new")} onAccept={() => { setSelectedService(SERVICES[2]); setBookingStep(0); go("time"); }} />}
+        {screen === "video-new" && <VideoNewRequest onBack={() => go("video-quotes")} onDone={() => go("video-quotes")} />}
+        {screen === "referral" && <Referral onBack={() => go("profile")} />}
+
+        {screen === "no-techs" && <NoTechs onRetry={() => go("home")} onLater={() => { setBookingStep(0); go("time"); }} />}
+        {screen === "payment-failed" && <PaymentFailed onRetry={() => go("review")} onChange={() => go("payment")} />}
+        {screen === "offline" && <Offline onRetry={() => go("home")} />}
+        {screen === "location-denied" && <LocationDenied onEnable={() => go("location")} onBack={() => go("location")} />}
 
         {/* Bottom tab bar — only on tabs */}
         {tabActive && (
@@ -158,11 +182,11 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   );
 }
 
-function PhoneEntry({ onSubmit }: { onSubmit: () => void }) {
+function PhoneEntry({ onSubmit, onBack }: { onSubmit: () => void; onBack: () => void }) {
   const [phone, setPhone] = useState("79 000 0000");
   return (
     <div className="h-full bg-white">
-      <TopBar title="" onBack={() => {}} />
+      <TopBar title="" onBack={onBack} />
       <div className="px-5 mt-2">
         <h1 style={{ fontWeight: 700, fontSize: 26 }}>أدخل رقم هاتفك</h1>
         <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">سنرسل لك رمز التحقق عبر واتساب</p>
@@ -246,27 +270,44 @@ function Permissions({ onDone }: { onDone: () => void }) {
 
 /* ---------- Home ---------- */
 
-function HomeScreen({ onPickService, onTracking, onNotifications, onSupport }: { onPickService: (s: typeof SERVICES[number]) => void; onTracking: () => void; onNotifications: () => void; onSupport: () => void }) {
+function HomeScreen({ member, onPickService, onTracking, onNotifications, onSupport, onProtection, onWallet, onVideo, onOffline }: { member: boolean; onPickService: (s: typeof SERVICES[number]) => void; onTracking: () => void; onNotifications: () => void; onSupport: () => void; onProtection: () => void; onWallet: () => void; onVideo: () => void; onOffline: () => void }) {
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setLoading(false), 700); return () => clearTimeout(t); }, []);
+
+  if (loading) return <HomeSkeleton />;
+
+  const ordered = [...SERVICES].sort((a, b) => Number(!isLaunch(a.id)) - Number(!isLaunch(b.id)));
   return (
     <div className="h-full overflow-y-auto pb-20">
       {/* Header */}
       <div className="px-5 pt-3 pb-4 bg-white">
         <div className="flex items-center justify-between">
           <div>
-            <div style={{ color: "#475569", fontSize: 12 }} className="flex items-center gap-1">
+            <button onClick={() => notify("اختيار الموقع — خلدا، عمّان")} className="flex items-center gap-1" style={{ color: "#475569", fontSize: 12 }}>
               <MapPin size={12} /> خلدا، عمّان <ChevronDown size={14} />
-            </div>
+            </button>
             <h1 className="mt-1" style={{ fontWeight: 700, fontSize: 22 }}>مرحباً أحمد 👋</h1>
           </div>
-          <button onClick={onNotifications} aria-label="notifications" className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center relative">
-            <Bell size={18} color="#0F172A" />
-            <span className="absolute top-1.5 end-1.5 w-2 h-2 rounded-full" style={{ background: "#E5484D" }} />
+          <div className="flex items-center gap-2">
+            <button onClick={onOffline} aria-label="حالة الاتصال" className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+              <WifiOff size={16} color="#94A3B8" />
+            </button>
+            <button onClick={onNotifications} aria-label="notifications" className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center relative">
+              <Bell size={18} color="#0F172A" />
+              <span className="absolute top-1.5 end-1.5 w-2 h-2 rounded-full" style={{ background: "#E5484D" }} />
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={soon} className="flex-1 h-12 rounded-xl bg-slate-100 flex items-center px-4 gap-2 text-start">
+            <Search size={18} color="#94A3B8" />
+            <span style={{ color: "#94A3B8", fontSize: 14 }}>ابحث عن خدمة...</span>
+          </button>
+          <button onClick={onWallet} className="h-12 px-3 rounded-xl flex items-center gap-1.5" style={{ background: "#DCFCE7" }}>
+            <Wallet size={16} color="#15803D" />
+            <span style={{ color: "#15803D", fontWeight: 700, fontSize: 12 }}>رصيدك: <span style={{ fontFamily: "Inter" }}>{CREDIT_BALANCE}</span> دينار</span>
           </button>
         </div>
-        <button onClick={soon} className="mt-4 h-12 w-full rounded-xl bg-slate-100 flex items-center px-4 gap-2 text-start">
-          <Search size={18} color="#94A3B8" />
-          <span style={{ color: "#94A3B8", fontSize: 14 }}>ابحث عن خدمة...</span>
-        </button>
       </div>
 
       {/* Active booking banner */}
@@ -283,39 +324,72 @@ function HomeScreen({ onPickService, onTracking, onNotifications, onSupport }: {
         </button>
       </Section>
 
+      {/* Trust strip */}
+      <div className="px-5 mt-4">
+        <div className="flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: "#E8F1FE" }}>
+          {[
+            { Icon: BadgeCheck, t: "فنيون معتمدون" },
+            { Icon: ShieldCheck, t: "ضمان 30 يوم" },
+            { Icon: Headphones, t: "دعم 24/7" },
+          ].map(({ Icon, t }) => (
+            <div key={t} className="flex flex-col items-center gap-1" style={{ color: "#0E4FA8" }}>
+              <Icon size={18} />
+              <span style={{ fontSize: 11, fontWeight: 600 }}>{t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Services grid */}
       <Section title="الخدمات">
         <div className="grid grid-cols-2 gap-3">
-          {SERVICES.map(s => (
-            <button key={s.id} onClick={() => onPickService(s)} className="text-start">
-              <Card className="p-4">
-                <ServiceIcon id={s.id} size={24} />
-                <div className="mt-3" style={{ fontWeight: 700, fontSize: 15 }}>{s.ar}</div>
-                <div className="mt-1 flex items-center justify-between">
-                  <PriceBadge amount={s.price} />
-                  <span style={{ color: "#94A3B8", fontSize: 11 }}><span style={{ fontFamily: "Inter" }}>{s.dur}</span> د</span>
-                </div>
-              </Card>
-            </button>
-          ))}
-          <button onClick={() => notify("خدمات جديدة قريباً!")} className="text-start">
-            <Card className="p-4 h-full flex flex-col items-center justify-center gap-2" style={{ background: "#F1F5F9" }}>
-              <Plus size={24} color="#94A3B8" />
-              <span style={{ color: "#475569", fontWeight: 600, fontSize: 13 }}>قريباً</span>
-            </Card>
-          </button>
+          {ordered.map(s => {
+            const soonSvc = !isLaunch(s.id);
+            return (
+              <button key={s.id} onClick={() => soonSvc ? notify("هذه الخدمة ستتوفر قريباً") : onPickService(s)} className="text-start relative">
+                <Card className="p-4" style={{ opacity: soonSvc ? 0.7 : 1 }}>
+                  {soonSvc && (
+                    <span className="absolute top-2 end-2 px-2 py-0.5 rounded-full" style={{ background: "#E2E8F0", color: "#475569", fontSize: 10, fontWeight: 700 }}>قريباً</span>
+                  )}
+                  <ServiceIcon id={s.id} size={24} />
+                  <div className="mt-3" style={{ fontWeight: 700, fontSize: 15 }}>{s.ar}</div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <PriceBadge amount={s.price} />
+                    <span style={{ color: "#94A3B8", fontSize: 11 }}><span style={{ fontFamily: "Inter" }}>{s.dur}</span> د</span>
+                  </div>
+                </Card>
+              </button>
+            );
+          })}
         </div>
       </Section>
 
-      {/* Promo */}
+      {/* Video pre-check entry */}
       <Section>
-        <Card className="p-4 flex items-center gap-3" style={{ background: "linear-gradient(95deg,#F5A623 0%,#EA8A0C 100%)" }}>
-          <div className="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center text-white"><Tag size={22} /></div>
-          <div className="flex-1">
-            <div style={{ color: "#FFF", fontWeight: 700, fontSize: 14 }}>خصم 20% على أول طلب</div>
-            <div style={{ color: "#FEF3C7", fontSize: 12 }}>استخدم رمز: FIXLY20</div>
-          </div>
-        </Card>
+        <button onClick={onVideo} className="w-full text-start">
+          <Card className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FE", color: "#7C3AED" }}><Video size={20} /></div>
+            <div className="flex-1">
+              <div style={{ fontWeight: 700, fontSize: 14 }}>لست متأكداً من المشكلة؟</div>
+              <div style={{ color: "#475569", fontSize: 12 }}>فحص مرئي — احصل على سعر ثابت</div>
+            </div>
+            <ChevronLeft size={20} color="#94A3B8" />
+          </Card>
+        </button>
+      </Section>
+
+      {/* Protection promo strip */}
+      <Section>
+        <button onClick={onProtection} className="w-full text-start">
+          <Card className="p-4 flex items-center gap-3" style={{ background: "linear-gradient(95deg,#1366D6 0%,#0E4FA8 100%)" }}>
+            <div className="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center text-white"><Star size={22} fill="#fff" /></div>
+            <div className="flex-1">
+              <div style={{ color: "#FFF", fontWeight: 700, fontSize: 14 }}>{member ? "عضو الحماية ✓" : "خطة الحماية"}</div>
+              <div style={{ color: "#CFE0FB", fontSize: 12 }}>{member ? "مزاياك مفعّلة — خصم 15% على كل خدمة" : "أولوية + خصم 15% + ضمان 90 يوم"}</div>
+            </div>
+            <ChevronLeft size={20} color="#FFF" />
+          </Card>
+        </button>
       </Section>
 
       <Section>
@@ -336,9 +410,30 @@ function HomeScreen({ onPickService, onTracking, onNotifications, onSupport }: {
   );
 }
 
+function HomeSkeleton() {
+  return (
+    <div className="h-full overflow-hidden pb-20 animate-pulse">
+      <div className="px-5 pt-3 pb-4 bg-white">
+        <div className="h-3 w-24 rounded bg-slate-200" />
+        <div className="mt-2 h-6 w-40 rounded bg-slate-200" />
+        <div className="mt-4 h-12 w-full rounded-xl bg-slate-100" />
+      </div>
+      <div className="px-5 mt-5"><div className="h-16 rounded-2xl bg-slate-100" /></div>
+      <div className="px-5 mt-5 grid grid-cols-2 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-slate-100" />)}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Service detail ---------- */
 
-function ServiceDetail({ svc, onBack, onBook }: { svc: typeof SERVICES[number]; onBack: () => void; onBook: () => void }) {
+function ServiceDetail({ svc, onBack, onBook, onVideo }: { svc: typeof SERVICES[number]; onBack: () => void; onBook: () => void; onVideo: () => void }) {
+  const [pkg, setPkg] = useState(0);
+  const packages = [
+    { name: "إصلاح", note: "إصلاح عطل قائم" },
+    { name: "تركيب", note: "تركيب قطعة جديدة" },
+  ];
   return (
     <div className="h-full bg-white relative">
       <TopBar title={svc.ar} onBack={onBack} />
@@ -357,7 +452,21 @@ function ServiceDetail({ svc, onBack, onBook }: { svc: typeof SERVICES[number]; 
           <div className="mt-2" style={{ color: "#0E4FA8", fontSize: 12 }}>لا مفاجآت — السعر شامل الفحص واليد العاملة</div>
         </div>
 
-        <Section title="ما يشمله">
+        {/* Package options */}
+        <Section title="نوع الخدمة">
+          <div className="grid grid-cols-2 gap-3">
+            {packages.map((p, i) => (
+              <button key={p.name} onClick={() => setPkg(i)} className="text-start">
+                <Card className="p-4" style={{ borderColor: pkg === i ? "#1366D6" : "transparent", borderWidth: 2 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
+                  <div style={{ color: "#475569", fontSize: 12 }} className="mt-1">{p.note}</div>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="يشمل السعر">
           <ul className="space-y-2.5">
             {["فحص شامل من فني معتمد", "إصلاح المشكلة الأساسية", "اختبار التشغيل بعد الإصلاح", "ضمان 30 يوم على العمل"].map(t => (
               <li key={t} className="flex items-center gap-2" style={{ fontSize: 14 }}>
@@ -366,6 +475,39 @@ function ServiceDetail({ svc, onBack, onBook }: { svc: typeof SERVICES[number]; 
               </li>
             ))}
           </ul>
+        </Section>
+
+        <Section title="لا يشمل السعر">
+          <ul className="space-y-2.5">
+            {["قطع الغيار والمواد (بموافقتك المسبقة)", "أعمال إضافية خارج نطاق الخدمة", "أضرار موجودة مسبقاً في المكان"].map(t => (
+              <li key={t} className="flex items-center gap-2" style={{ fontSize: 14, color: "#475569" }}>
+                <X size={18} color="#E5484D" />
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        {/* Callout fee note */}
+        <Section>
+          <Card className="p-3 flex items-start gap-2.5" style={{ background: "#FEF3C7" }}>
+            <AlertCircle size={18} color="#B45309" />
+            <p style={{ color: "#92400E", fontSize: 13 }}>رسوم كشف <span style={{ fontFamily: "Inter", fontWeight: 700 }}>5</span> دنانير تُخصم من قيمة الإصلاح عند المتابعة.</p>
+          </Card>
+        </Section>
+
+        {/* Video pre-check entry */}
+        <Section>
+          <button onClick={onVideo} className="w-full text-start">
+            <Card className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FE", color: "#7C3AED" }}><Video size={20} /></div>
+              <div className="flex-1">
+                <div style={{ fontWeight: 700, fontSize: 14 }}>فحص مرئي؟ احصل على سعر ثابت</div>
+                <div style={{ color: "#475569", fontSize: 12 }}>للحالات غير المؤكدة — أرسل فيديو للمشكلة</div>
+              </div>
+              <ChevronLeft size={18} color="#94A3B8" />
+            </Card>
+          </button>
         </Section>
 
         <Section title="ملاحظة">
@@ -449,11 +591,17 @@ function TimeStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }
   );
 }
 
-function LocationStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+function LocationStep({ onBack, onNext, onDenied }: { onBack: () => void; onNext: () => void; onDenied: () => void }) {
   return (
     <div className="h-full bg-white relative">
       <BookingHeader step={1} onBack={onBack} title="حدد الموقع" />
-      <MapMock height={300} customerLabel="حدد موقعك هنا" />
+      <div className="relative">
+        <MapMock height={300} customerLabel="اسحب لتحديد موقعك" />
+        <div className="absolute top-3 inset-x-5 flex justify-between">
+          <button onClick={() => notify("تم تثبيت الدبوس على موقعك")} className="px-3 py-1.5 rounded-full bg-white shadow text-[12px] font-semibold" style={{ color: "#1366D6" }}>حدد موقعك</button>
+          <button onClick={onDenied} className="px-3 py-1.5 rounded-full bg-white shadow text-[12px] font-semibold" style={{ color: "#E5484D" }}>الموقع مرفوض؟</button>
+        </div>
+      </div>
       <div className="px-5 pt-4 space-y-3 overflow-y-auto" style={{ maxHeight: 280 }}>
         <div className="flex items-center gap-2 p-3 rounded-xl border border-slate-200">
           <MapPin size={18} color="#1366D6" />
@@ -505,12 +653,25 @@ function PaymentStep({ onBack, onNext }: { onBack: () => void; onNext: () => voi
   );
 }
 
-function ReviewStep({ svc, onBack, onConfirm }: { svc: typeof SERVICES[number]; onBack: () => void; onConfirm: () => void }) {
-  const [promo, setPromo] = useState("FIXLY20");
-  const [applied, setApplied] = useState(true);
+function ReviewStep({ svc, member, onBack, onConfirm, onFail }: { svc: typeof SERVICES[number]; member: boolean; onBack: () => void; onConfirm: () => void; onFail: () => void }) {
+  const [promo, setPromo] = useState("");
+  const [applied, setApplied] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const discount = applied ? Math.round(svc.price * 0.2) : 0;
-  const total = svc.price - discount;
+  const [handoff, setHandoff] = useState(false);
+
+  const callout = 5;
+  const memberDiscount = member ? Math.round(svc.price * 0.15) : 0;
+  const promoDiscount = applied ? 5 : 0;
+  const creditApplied = Math.min(CREDIT_BALANCE, Math.max(0, svc.price + callout - memberDiscount - promoDiscount));
+  const total = Math.max(0, svc.price + callout - memberDiscount - promoDiscount - creditApplied);
+
+  const doPay = () => {
+    setConfirming(false);
+    setHandoff(true);
+    // Simulate secure payment handoff → success. (Failure path reachable via button.)
+    setTimeout(() => { setHandoff(false); onConfirm(); }, 1400);
+  };
+
   return (
     <div className="h-full bg-white relative">
       <BookingHeader step={3} onBack={onBack} title="مراجعة وتأكيد" />
@@ -541,19 +702,29 @@ function ReviewStep({ svc, onBack, onConfirm }: { svc: typeof SERVICES[number]; 
           </div>
         </Card>
 
+        {member && (
+          <Card className="p-3 flex items-center gap-2" style={{ background: "#E8F1FE" }}>
+            <Star size={16} color="#1366D6" fill="#1366D6" />
+            <span style={{ color: "#0E4FA8", fontSize: 12, fontWeight: 600 }}>عضو الحماية — خصم العضوية −15% مُطبّق</span>
+          </Card>
+        )}
+
         <Card className="p-4">
           <div style={{ fontSize: 13, fontWeight: 600, color: "#475569" }} className="mb-2">أدخل رمز الخصم</div>
           <div className="flex gap-2">
-            <input value={promo} onChange={(e) => setPromo(e.target.value)} className="flex-1 h-11 rounded-lg border border-slate-200 px-3 outline-none" style={{ fontSize: 14, fontFamily: "Inter" }} />
-            <button onClick={() => setApplied(true)} className="px-4 rounded-lg" style={{ background: applied ? "#DCFCE7" : "#1366D6", color: applied ? "#15803D" : "#FFF", fontWeight: 600, fontSize: 13 }}>{applied ? "✓ مُطبَّق" : "تطبيق"}</button>
+            <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="FIXLY20" className="flex-1 h-11 rounded-lg border border-slate-200 px-3 outline-none" style={{ fontSize: 14, fontFamily: "Inter" }} />
+            <button onClick={() => { if (promo.trim()) { setApplied(true); notify("تم تطبيق رمز الخصم", "success"); } }} className="px-4 rounded-lg" style={{ background: applied ? "#DCFCE7" : "#1366D6", color: applied ? "#15803D" : "#FFF", fontWeight: 600, fontSize: 13 }}>{applied ? "✓ مُطبَّق" : "تطبيق"}</button>
           </div>
         </Card>
 
         <Card className="p-4">
           <InlineRow label="سعر الخدمة" value={`${svc.price} دينار`} />
-          {applied && <InlineRow label="خصم FIXLY20" value={<span style={{ color: "#1FAA59" }}>−{discount} دينار</span>} />}
+          <InlineRow label="رسوم الكشف" value={`${callout} دينار`} />
+          {member && <InlineRow label="خصم العضوية −15%" value={<span style={{ color: "#1FAA59" }}>−{memberDiscount} دينار</span>} />}
+          {applied && <InlineRow label={`خصم ${promo || "FIXLY20"}`} value={<span style={{ color: "#1FAA59" }}>−{promoDiscount} دينار</span>} />}
+          {creditApplied > 0 && <InlineRow label="خصم رصيدك (تلقائي)" value={<span style={{ color: "#1FAA59" }}>−{creditApplied} دينار</span>} />}
           <div className="h-px bg-slate-100 my-1" />
-          <InlineRow strong label="الإجمالي" value={`${total} دينار`} />
+          <InlineRow strong label="الإجمالي للدفع" value={`${total} دينار`} />
         </Card>
 
         <Card className="p-3 flex items-start gap-2.5" style={{ background: "#E8F1FE" }}>
@@ -567,9 +738,16 @@ function ReviewStep({ svc, onBack, onConfirm }: { svc: typeof SERVICES[number]; 
           title="تأكيد الحجز"
           body={`سيتم حجز ${total} دينار عبر Apple Pay وخصمه بعد إتمام الخدمة.`}
           confirmLabel="تأكيد والدفع"
-          onConfirm={onConfirm}
+          onConfirm={doPay}
           onCancel={() => setConfirming(false)}
         />
+      )}
+      {handoff && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4" style={{ background: "rgba(255,255,255,0.96)" }}>
+          <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-[#1366D6] animate-spin" />
+          <p style={{ color: "#475569", fontSize: 14 }}>جارٍ فتح صفحة الدفع الآمنة…</p>
+          <button onClick={onFail} style={{ color: "#94A3B8", fontSize: 12 }}>محاكاة: فشل الدفع</button>
+        </div>
       )}
     </div>
   );
@@ -602,11 +780,191 @@ function Searching({ onAssign, onCancel, onNoTechs }: { onAssign: () => void; on
 
 /* ---------- Live tracking ---------- */
 
-function LiveTracking({ svc, onCancel, onInProgress, onBack, onApprove }: { svc: typeof SERVICES[number]; onCancel: () => void; onInProgress: () => void; onBack: () => void; onApprove: () => void; }) {
+/* ---------- Technician assigned (trust moment) ---------- */
+
+function CertifiedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: "#E8F1FE", color: "#1366D6", fontSize: 11, fontWeight: 700 }}>
+      <BadgeCheck size={12} /> فني معتمد
+    </span>
+  );
+}
+function TrustTierChip() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#7C3AED", fontSize: 11, fontWeight: 700 }}>
+      <Award size={12} /> محترف
+    </span>
+  );
+}
+
+function TechnicianAssigned({ svc, onTrack, onReviews, onCancel }: { svc: typeof SERVICES[number]; onTrack: () => void; onReviews: () => void; onCancel: () => void }) {
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="تم العثور على فني" onBack={onCancel} />
+      <div className="px-5 mt-4 overflow-y-auto pb-32" style={{ height: "calc(100% - 56px)" }}>
+        <Card className="p-5 text-center">
+          <div className="flex justify-center"><Avatar name="خالد المومني" size={72} verified /></div>
+          <h2 className="mt-3" style={{ fontWeight: 700, fontSize: 20 }}>خالد المومني</h2>
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <CertifiedBadge />
+            <TrustTierChip />
+          </div>
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <Stars rating={4.9} size={14} />
+            <span style={{ color: "#94A3B8", fontSize: 12 }}>· <span style={{ fontFamily: "Inter" }}>320</span> خدمة</span>
+          </div>
+          <div style={{ color: "#475569", fontSize: 12 }} className="mt-2">تويوتا كورولا · أبيض · <span style={{ fontFamily: "Inter" }}>34-12345</span></div>
+        </Card>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={() => notify("تشغيل الفيديو التعريفي…")} className="text-start">
+            <Card className="p-3 flex items-center gap-2">
+              <PlayCircle size={20} color="#7C3AED" />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>الفيديو التعريفي</span>
+            </Card>
+          </button>
+          <button onClick={() => notify("عرض الشهادات والتراخيص…")} className="text-start">
+            <Card className="p-3 flex items-center gap-2">
+              <FileText size={20} color="#1366D6" />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>الشهادات</span>
+            </Card>
+          </button>
+        </div>
+
+        <button onClick={onReviews} className="w-full mt-3 text-start">
+          <Card className="p-4 flex items-center gap-3">
+            <Star size={20} color="#F5A623" fill="#F5A623" />
+            <span className="flex-1" style={{ fontSize: 14, fontWeight: 600 }}>عرض التقييمات</span>
+            <ChevronLeft size={18} color="#94A3B8" />
+          </Card>
+        </button>
+
+        <Card className="mt-3 p-3 flex items-center gap-2" style={{ background: "#CCFBF1" }}>
+          <ShieldCheck size={18} color="#0F766E" />
+          <span style={{ color: "#0F766E", fontSize: 12, fontWeight: 600 }}>{svc.ar} — الفني في الطريق إليك</span>
+        </Card>
+      </div>
+      <FullCTA onClick={onTrack}>تتبع الفني مباشرةً</FullCTA>
+    </div>
+  );
+}
+
+function TechnicianReviews({ onBack }: { onBack: () => void }) {
+  const reviews = [
+    { name: "سارة خالد", r: 5, t: "فني محترف وسريع، أنجز العمل بإتقان.", d: "02/06/2026" },
+    { name: "محمد الزعبي", r: 5, t: "التزم بالموعد والسعر تماماً. شكراً.", d: "28/05/2026" },
+    { name: "رنا حدّاد", r: 4, t: "خدمة جيدة، تأخر قليلاً لكنه اعتذر.", d: "19/05/2026" },
+  ];
+  return (
+    <div className="h-full bg-white">
+      <TopBar title="تقييمات خالد" onBack={onBack} />
+      <div className="px-5 mt-3 overflow-y-auto pb-8" style={{ height: "calc(100% - 56px)" }}>
+        <Card className="p-4 flex items-center gap-4">
+          <div className="text-center">
+            <div style={{ fontFamily: "Inter", fontWeight: 800, fontSize: 32, color: "#0F172A" }}>4.9</div>
+            <Stars rating={4.9} size={12} />
+          </div>
+          <div className="flex-1">
+            <div style={{ color: "#475569", fontSize: 12 }}>بناءً على <span style={{ fontFamily: "Inter" }}>320</span> خدمة</div>
+          </div>
+        </Card>
+        <div className="mt-3 space-y-3">
+          {reviews.map((rv, i) => (
+            <Card key={i} className="p-4">
+              <div className="flex items-center gap-2">
+                <Avatar name={rv.name} size={32} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{rv.name}</span>
+                    <span className="px-1.5 py-0.5 rounded" style={{ background: "#DCFCE7", color: "#15803D", fontSize: 10, fontWeight: 700 }}>تقييم موثّق</span>
+                  </div>
+                  <Stars rating={rv.r} size={11} />
+                </div>
+                <span style={{ color: "#94A3B8", fontSize: 11, fontFamily: "Inter" }}>{rv.d}</span>
+              </div>
+              <p style={{ color: "#475569", fontSize: 13 }} className="mt-2">{rv.t}</p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportTechnician({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const [reason, setReason] = useState(-1);
+  const reasons = ["محاولة تعامل خارج التطبيق", "لم يحضر", "جودة سيئة", "سلوك / سلامة", "أخرى"];
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="الإبلاغ عن مشكلة" onBack={onBack} />
+      <div className="px-5 mt-3 space-y-2">
+        <p style={{ color: "#475569", fontSize: 13 }} className="mb-1">سبب البلاغ</p>
+        {reasons.map((r, i) => (
+          <button key={r} onClick={() => setReason(i)} className="w-full text-start">
+            <Card className="p-4 flex items-center" style={{ borderColor: reason === i ? "#1366D6" : "transparent", borderWidth: 2 }}>
+              <span className="flex-1" style={{ fontSize: 14 }}>{r}</span>
+              <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center" style={{ borderColor: reason === i ? "#1366D6" : "#CBD5E1" }}>
+                {reason === i && <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#1366D6" }} />}
+              </div>
+            </Card>
+          </button>
+        ))}
+        <textarea placeholder="تفاصيل إضافية (اختياري)" className="w-full mt-2 rounded-xl border border-slate-200 px-4 py-3 outline-none resize-none" rows={3} style={{ fontSize: 14 }} />
+        <Card className="p-3 flex items-start gap-2" style={{ background: "#FEF3C7" }}>
+          <AlertCircle size={16} color="#B45309" />
+          <p style={{ color: "#92400E", fontSize: 12 }}>أبقِ التعامل داخل التطبيق — الضمان والرصيد صالحان فقط للحجوزات داخل Fixly.</p>
+        </Card>
+      </div>
+      <FullCTA onClick={() => { if (reason < 0) { notify("اختر سبب البلاغ"); return; } notify("تم استلام بلاغك، سيراجعه فريقنا", "success"); onDone(); }}>إرسال البلاغ</FullCTA>
+    </div>
+  );
+}
+
+/* ---------- Arrived + late-compensation ---------- */
+
+function Arrived({ onInProgress, onWallet, onBack }: { onInProgress: () => void; onWallet: () => void; onBack: () => void }) {
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="وصل الفني" onBack={onBack} />
+      <div className="px-5 pt-4 text-center overflow-y-auto pb-28" style={{ height: "calc(100% - 56px)" }}>
+        <StatusBadge status="arrived" />
+        <div className="mt-6 w-32 h-32 mx-auto rounded-full flex items-center justify-center" style={{ background: "#CCFBF1" }}>
+          <MapPin size={64} color="#0F766E" />
+        </div>
+        <h1 className="mt-5" style={{ fontWeight: 700, fontSize: 22 }}>الفني وصل</h1>
+        <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">خالد المومني عند بابك الآن.</p>
+
+        {/* Late-compensation banner */}
+        <button onClick={onWallet} className="w-full text-start mt-6">
+          <Card className="p-4 flex items-start gap-3" style={{ background: "#DCFCE7" }}>
+            <Gift size={24} color="#15803D" />
+            <div>
+              <div style={{ color: "#15803D", fontWeight: 700, fontSize: 14 }}>تأخر الفني</div>
+              <p style={{ color: "#166534", fontSize: 13 }} className="mt-0.5">تم إضافة <span style={{ fontFamily: "Inter", fontWeight: 700 }}>20</span> دينار إلى رصيدك تلقائياً كتعويض. اضغط لعرض المحفظة.</p>
+            </div>
+          </Card>
+        </button>
+      </div>
+      <FullCTA onClick={onInProgress}>بدء الخدمة</FullCTA>
+    </div>
+  );
+}
+
+function LiveTracking({ svc, onCancel, onArrived, onInProgress, onBack, onReport, onReviews }: { svc: typeof SERVICES[number]; onCancel: () => void; onArrived: () => void; onInProgress: () => void; onBack: () => void; onReport: () => void; onReviews: () => void; }) {
+  const [menu, setMenu] = useState(false);
   return (
     <div className="h-full relative">
       <div className="absolute top-0 inset-x-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200">
-        <TopBar title="تتبع الفني" onBack={onBack} />
+        <TopBar title="تتبع الفني" onBack={onBack} right={
+          <button onClick={() => setMenu(m => !m)} aria-label="المزيد" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center"><MoreVertical size={18} /></button>
+        } />
+        {menu && (
+          <div className="absolute end-3 top-14 z-30 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+            <button onClick={() => { setMenu(false); onReport(); }} className="px-4 py-3 flex items-center gap-2 w-44 text-start" style={{ fontSize: 13, color: "#E5484D" }}>
+              <Flag size={16} /> الإبلاغ عن مشكلة
+            </button>
+          </div>
+        )}
       </div>
       <div className="pt-14 h-full flex flex-col">
         <div className="flex-1 relative">
@@ -634,23 +992,24 @@ function LiveTracking({ svc, onCancel, onInProgress, onBack, onApprove }: { svc:
             ))}
           </div>
 
-          <div className="mt-4 flex items-center gap-3">
+          <button onClick={onReviews} className="mt-4 w-full flex items-center gap-3 text-start">
             <Avatar name="خالد المومني" size={48} verified />
             <div className="flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span style={{ fontWeight: 700, fontSize: 15 }}>خالد المومني</span>
+                <CertifiedBadge />
+                <TrustTierChip />
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <Stars rating={4.9} size={12} />
-                <span style={{ color: "#94A3B8", fontSize: 11 }}>· <span style={{ fontFamily: "Inter" }}>320</span> خدمة</span>
+                <span style={{ color: "#94A3B8", fontSize: 11 }}>· <span style={{ fontFamily: "Inter" }}>320</span> خدمة · عرض التقييمات ›</span>
               </div>
               <div style={{ color: "#475569", fontSize: 11 }} className="mt-0.5">تويوتا كورولا · أبيض · <span style={{ fontFamily: "Inter" }}>34-12345</span></div>
             </div>
-            <button onClick={onInProgress} className="text-xs px-2 py-1 rounded-md" style={{ background: "#FEF3C7", color: "#B45309", fontWeight: 600 }}>محاكاة: بدأ</button>
-          </div>
+          </button>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <button onClick={() => notify("جارٍ الاتصال بالفني خالد…")} className="h-11 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5" style={{ fontSize: 13, fontWeight: 600 }}>
+            <button onClick={() => notify("جارٍ الاتصال المُقنّع بالفني — 079 0••• ••00")} className="h-11 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5" style={{ fontSize: 13, fontWeight: 600 }}>
               <Phone size={16} color="#1366D6" /> اتصال
             </button>
             <button onClick={() => notify("فتح محادثة مع خالد…")} className="h-11 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5" style={{ fontSize: 13, fontWeight: 600 }}>
@@ -660,6 +1019,7 @@ function LiveTracking({ svc, onCancel, onInProgress, onBack, onApprove }: { svc:
               <X size={16} /> إلغاء
             </button>
           </div>
+          <p style={{ color: "#94A3B8", fontSize: 11 }} className="mt-2 text-center">الإلغاء مجاني قبل انطلاق الفني؛ قد تُطبّق رسوم إلغاء بعد ذلك.</p>
 
           <div className="mt-3 p-3 rounded-xl flex items-center gap-2" style={{ background: "#F1F5F9" }}>
             <ServiceIcon id={svc.id} size={18} />
@@ -668,6 +1028,11 @@ function LiveTracking({ svc, onCancel, onInProgress, onBack, onApprove }: { svc:
               <div style={{ color: "#475569", fontSize: 11 }}>الرقم #FX-20603</div>
             </div>
             <PriceBadge amount={svc.price} />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button onClick={onArrived} className="text-xs px-2 py-2 rounded-lg" style={{ background: "#CCFBF1", color: "#0F766E", fontWeight: 600 }}>محاكاة: وصل الفني</button>
+            <button onClick={onInProgress} className="text-xs px-2 py-2 rounded-lg" style={{ background: "#FEF3C7", color: "#B45309", fontWeight: 600 }}>محاكاة: بدأ العمل</button>
           </div>
         </div>
       </div>
@@ -943,7 +1308,7 @@ function BookingDetail({ onBack }: { onBack: () => void }) {
 
 /* ---------- Guarantee ---------- */
 
-function GuaranteeHome({ onNew, onTicket }: { onNew: () => void; onTicket: () => void }) {
+function GuaranteeHome({ member, onNew, onTicket }: { member: boolean; onNew: () => void; onTicket: () => void }) {
   return (
     <div className="h-full overflow-y-auto pb-20">
       <div className="bg-white px-5 pt-3 pb-5">
@@ -951,8 +1316,8 @@ function GuaranteeHome({ onNew, onTicket }: { onNew: () => void; onTicket: () =>
         <Card className="mt-4 p-4 flex items-start gap-3" style={{ background: "linear-gradient(95deg,#1FAA59 0%,#15803D 100%)" }}>
           <ShieldCheck size={28} color="#FFF" />
           <div>
-            <div style={{ color: "#FFF", fontWeight: 700, fontSize: 16 }}>ضمان 30 يوم</div>
-            <div style={{ color: "#DCFCE7", fontSize: 12 }} className="mt-1">إذا تكررت المشكلة خلال 30 يوم، نعيد الإصلاح مجاناً أو نسترد المبلغ.</div>
+            <div style={{ color: "#FFF", fontWeight: 700, fontSize: 16 }}>ضمان {member ? "90 يوماً" : "30 يوماً"}</div>
+            <div style={{ color: "#DCFCE7", fontSize: 12 }} className="mt-1">إذا تكررت المشكلة خلال المدة، نعيد الإصلاح مجاناً أو نسترد المبلغ.{member ? "" : " (90 يوماً لأعضاء الحماية)"}</div>
           </div>
         </Card>
       </div>
@@ -1075,13 +1440,19 @@ function GuaranteeTicket({ onBack }: { onBack: () => void }) {
 
 /* ---------- Profile + edges ---------- */
 
-function Profile({ onAddresses, onPayments, onNotifs, onSupport, onSettings, onEditProfile }: any) {
+function Profile({ member, onAddresses, onPayments, onNotifs, onSupport, onSettings, onEditProfile, onProtection, onWallet, onVideo, onReferral }: any) {
+  const quick = [
+    { icon: Star, label: "خطة الحماية", action: onProtection, tint: "#EDE9FE", color: "#7C3AED" },
+    { icon: Wallet, label: "المحفظة", action: onWallet, tint: "#DCFCE7", color: "#15803D" },
+    { icon: Video, label: "الفحص المرئي", action: onVideo, tint: "#E8F1FE", color: "#1366D6" },
+    { icon: Gift, label: "ادعُ صديقاً", action: onReferral, tint: "#FEF3C7", color: "#B45309" },
+  ];
   const rows = [
     { icon: MapPin, label: "العناوين المحفوظة", action: onAddresses },
     { icon: CreditCard, label: "وسائل الدفع", action: onPayments },
     { icon: Bell, label: "الإشعارات", action: onNotifs },
     { icon: Headphones, label: "الدعم والمساعدة", action: onSupport },
-    { icon: User, label: "الإعدادات", action: onSettings },
+    { icon: SettingsIcon, label: "الإعدادات", action: onSettings },
   ];
   return (
     <div className="h-full overflow-y-auto pb-20">
@@ -1090,12 +1461,36 @@ function Profile({ onAddresses, onPayments, onNotifs, onSupport, onSettings, onE
         <Card className="mt-4 p-4 flex items-center gap-4">
           <Avatar name="أحمد العلي" size={56} verified />
           <div className="flex-1">
-            <div style={{ fontWeight: 700, fontSize: 17 }}>أحمد العلي</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span style={{ fontWeight: 700, fontSize: 17 }}>أحمد العلي</span>
+              {member && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: "#E8F1FE", color: "#1366D6", fontSize: 11, fontWeight: 700 }}>
+                  <Star size={12} fill="#1366D6" /> عضو الحماية
+                </span>
+              )}
+            </div>
             <div style={{ color: "#475569", fontSize: 13, fontFamily: "Inter" }}>+962 79 0••• ••00</div>
           </div>
           <button onClick={onEditProfile} style={{ color: "#1366D6", fontWeight: 600, fontSize: 13 }}>تعديل</button>
         </Card>
+        <button onClick={onWallet} className="mt-3 w-full flex items-center justify-between rounded-xl px-4 py-3" style={{ background: "#DCFCE7" }}>
+          <span className="flex items-center gap-2" style={{ color: "#15803D", fontWeight: 700, fontSize: 13 }}><Wallet size={16} /> رصيدك</span>
+          <span style={{ color: "#15803D", fontWeight: 700, fontSize: 15 }}><span style={{ fontFamily: "Inter" }}>{CREDIT_BALANCE}</span> دينار ›</span>
+        </button>
       </div>
+
+      <Section>
+        <div className="grid grid-cols-4 gap-2">
+          {quick.map(q => (
+            <button key={q.label} onClick={q.action} className="flex flex-col items-center gap-1.5">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: q.tint, color: q.color }}>
+                <q.icon size={22} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#475569", textAlign: "center" }}>{q.label}</span>
+            </button>
+          ))}
+        </div>
+      </Section>
 
       <Section>
         <Card className="overflow-hidden">
@@ -1108,16 +1503,6 @@ function Profile({ onAddresses, onPayments, onNotifs, onSupport, onSettings, onE
               <ChevronLeft size={18} color="#94A3B8" />
             </button>
           ))}
-        </Card>
-      </Section>
-
-      <Section>
-        <Card className="p-4 flex items-center gap-3" style={{ background: "linear-gradient(95deg,#1366D6 0%,#0E4FA8 100%)" }}>
-          <ShieldCheck size={28} color="#FFF" />
-          <div className="flex-1">
-            <div style={{ color: "#FFF", fontWeight: 700, fontSize: 14 }}>تحقق من حسابك</div>
-            <div style={{ color: "#CFE0FB", fontSize: 12 }}>احصل على شارة التوثيق</div>
-          </div>
         </Card>
       </Section>
     </div>
@@ -1284,7 +1669,7 @@ const FAQ_ITEMS = [
   { q: "هل الأسعار ثابتة؟", a: "نعم، السعر المعروض هو السعر النهائي. لا مفاجآت. قد يُضاف عمل إضافي فقط بموافقتك المسبقة." },
 ];
 
-function Support({ onBack }: { onBack: () => void }) {
+function Support({ member, onBack }: { member: boolean; onBack: () => void }) {
   return (
     <div className="h-full bg-white">
       <TopBar title="الدعم والمساعدة" onBack={onBack} />
@@ -1296,6 +1681,14 @@ function Support({ onBack }: { onBack: () => void }) {
             <div style={{ color: "#CFE0FB", fontSize: 12 }}>الرد خلال 5 دقائق</div>
           </div>
         </Card>
+        {member && (
+          <button onClick={() => notify("دعم VIP — أولوية في الرد")} className="w-full text-start">
+            <Card className="p-3 flex items-center gap-2" style={{ background: "#EDE9FE" }}>
+              <Star size={18} color="#7C3AED" fill="#7C3AED" />
+              <span style={{ color: "#6D28D9", fontWeight: 700, fontSize: 13 }}>دعم VIP — أولوية في الرد لأعضاء الحماية</span>
+            </Card>
+          </button>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <button onClick={() => notify("جارٍ الاتصال بـ +962 6 555 0000…")} className="text-start">
             <Card className="p-4 text-center">
@@ -1516,7 +1909,7 @@ function SettingsAppearance({ onBack }: { onBack: () => void }) {
 
 /* ---------- Edge cases ---------- */
 
-function NoTechs({ onRetry }: { onRetry: () => void }) {
+function NoTechs({ onRetry, onLater }: { onRetry: () => void; onLater: () => void }) {
   return (
     <div className="h-full bg-white flex flex-col items-center justify-center px-8 text-center">
       <div className="text-7xl mb-5">🛠️</div>
@@ -1524,8 +1917,306 @@ function NoTechs({ onRetry }: { onRetry: () => void }) {
       <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">حاول بعد قليل، أو اختر موعداً لاحقاً.</p>
       <div className="absolute bottom-8 inset-x-5 space-y-2">
         <PrimaryButton onClick={onRetry}>إعادة المحاولة</PrimaryButton>
-        <PrimaryButton variant="outline" onClick={onRetry}>حجز لاحقاً</PrimaryButton>
+        <PrimaryButton variant="outline" onClick={onLater}>حجز لاحقاً</PrimaryButton>
       </div>
+    </div>
+  );
+}
+
+function PaymentFailed({ onRetry, onChange }: { onRetry: () => void; onChange: () => void }) {
+  return (
+    <div className="h-full bg-white flex flex-col items-center justify-center px-8 text-center">
+      <div className="w-28 h-28 rounded-full flex items-center justify-center" style={{ background: "#FEE2E2" }}>
+        <X size={56} color="#E5484D" strokeWidth={2.5} />
+      </div>
+      <h1 className="mt-6" style={{ fontWeight: 700, fontSize: 22 }}>فشلت عملية الدفع</h1>
+      <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">فشلت عملية الدفع. جرّب وسيلة دفع أخرى.</p>
+      <div className="absolute bottom-8 inset-x-5 space-y-2">
+        <PrimaryButton onClick={onRetry}>إعادة المحاولة</PrimaryButton>
+        <PrimaryButton variant="outline" onClick={onChange}>تغيير وسيلة الدفع</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function Offline({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="h-full bg-white flex flex-col items-center justify-center px-8 text-center">
+      <div className="w-28 h-28 rounded-full flex items-center justify-center" style={{ background: "#F1F5F9" }}>
+        <WifiOff size={56} color="#94A3B8" />
+      </div>
+      <h1 className="mt-6" style={{ fontWeight: 700, fontSize: 22 }}>لا يوجد اتصال</h1>
+      <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">تعذّر الاتصال. تحقق من الإنترنت وحاول مجدداً.</p>
+      <div className="absolute bottom-8 inset-x-5">
+        <PrimaryButton onClick={onRetry}><span className="inline-flex items-center gap-2"><RefreshCw size={16} /> إعادة المحاولة</span></PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function LocationDenied({ onEnable, onBack }: { onEnable: () => void; onBack: () => void }) {
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="الموقع" onBack={onBack} />
+      <div className="h-full flex flex-col items-center justify-center px-8 text-center">
+        <div className="w-28 h-28 rounded-full flex items-center justify-center" style={{ background: "#FEF3C7" }}>
+          <MapPin size={56} color="#B45309" />
+        </div>
+        <h1 className="mt-6" style={{ fontWeight: 700, fontSize: 22 }}>الموقع غير مفعّل</h1>
+        <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">فعّل الموقع لتحديد عنوانك وإرسال أقرب فني.</p>
+      </div>
+      <div className="absolute bottom-8 inset-x-5 space-y-2">
+        <PrimaryButton onClick={onEnable}>تفعيل الموقع</PrimaryButton>
+        <PrimaryButton variant="ghost" onClick={onBack}>إدخال العنوان يدوياً</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Protection Plan ---------- */
+
+function ProtectionPlan({ member, renewDate, onBack, onSubscribe, onCancel }: { member: boolean; renewDate: string; onBack: () => void; onSubscribe: () => void; onCancel: () => void }) {
+  const [pastDue] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const benefits = [
+    { Icon: Clock, t: "أولوية خلال 30 دقيقة" },
+    { Icon: Tag, t: "خصم 15% على كل خدمة" },
+    { Icon: ShieldCheck, t: "ضمان ممتد 90 يوم" },
+    { Icon: BadgeCheck, t: "فحص مجاني كل 3 أشهر" },
+    { Icon: Headphones, t: "دعم VIP — أولوية في الرد" },
+  ];
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="خطة الحماية" onBack={onBack} />
+      <div className="px-5 mt-3 overflow-y-auto pb-32" style={{ height: "calc(100% - 56px)" }}>
+        <Card className="p-5" style={{ background: "linear-gradient(135deg,#1366D6 0%,#0E4FA8 100%)" }}>
+          <div className="flex items-center gap-2">
+            <Star size={24} color="#FFF" fill="#FFF" />
+            <span style={{ color: "#FFF", fontWeight: 800, fontSize: 20 }}>خطة الحماية</span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-1" style={{ color: "#FFF" }}>
+            <span style={{ fontFamily: "Inter", fontWeight: 800, fontSize: 32 }}>5</span>
+            <span style={{ fontSize: 14 }}>دنانير / شهر</span>
+          </div>
+          {member && (
+            <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.25)", color: "#FFF", fontSize: 11, fontWeight: 700 }}>
+              {pastDue ? "متأخر" : "فعّال"} · يتجدد في <span style={{ fontFamily: "Inter" }}>{renewDate}</span>
+            </div>
+          )}
+        </Card>
+
+        {member && pastDue && (
+          <Card className="mt-3 p-3 flex items-start gap-2" style={{ background: "#FEF3C7" }}>
+            <AlertCircle size={18} color="#B45309" />
+            <p style={{ color: "#92400E", fontSize: 13 }}>تعذّر التجديد — حدّث بطاقتك للاستمرار في التمتع بالمزايا.</p>
+          </Card>
+        )}
+
+        <Section title="المزايا">
+          <Card className="p-4 space-y-3">
+            {benefits.map(({ Icon, t }) => (
+              <div key={t} className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#E8F1FE", color: "#1366D6" }}><Icon size={18} /></div>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t}</span>
+              </div>
+            ))}
+          </Card>
+        </Section>
+
+        {member && (
+          <Card className="mt-3 p-3" style={{ background: "#DCFCE7" }}>
+            <p style={{ color: "#166534", fontSize: 12 }}>وفّرت <span style={{ fontFamily: "Inter", fontWeight: 700 }}>18</span> دينار هذا الشهر بفضل عضويتك.</p>
+          </Card>
+        )}
+      </div>
+
+      {member ? (
+        <div className="absolute bottom-0 inset-x-0 px-5 pt-3 pb-6 bg-white border-t border-slate-100 space-y-2">
+          {pastDue && <PrimaryButton onClick={() => notify("تم فتح تحديث البطاقة")}>تحديث البطاقة</PrimaryButton>}
+          <PrimaryButton variant="ghost" onClick={() => setConfirmCancel(true)}>إلغاء الاشتراك</PrimaryButton>
+        </div>
+      ) : (
+        <FullCTA onClick={onSubscribe}>اشترك الآن — <span style={{ fontFamily: "Inter" }}>5</span> دنانير/شهر</FullCTA>
+      )}
+      {confirmCancel && (
+        <ConfirmDialog
+          title="إلغاء خطة الحماية؟"
+          body="ستبقى المزايا حتى نهاية الفترة."
+          confirmLabel="تأكيد الإلغاء"
+          variant="destructive"
+          onConfirm={() => { setConfirmCancel(false); onCancel(); }}
+          onCancel={() => setConfirmCancel(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Wallet / service credits ---------- */
+
+function WalletScreen({ onBack }: { onBack: () => void }) {
+  const history = [
+    { reason: "تعويض تأخير", date: "06/06/2026", amount: 20 },
+    { reason: "إحالة صديق", date: "01/06/2026", amount: 5 },
+    { reason: "استخدام على حجز سباكة", date: "28/05/2026", amount: -5 },
+  ];
+  const empty = false;
+  return (
+    <div className="h-full bg-white">
+      <TopBar title="رصيدي" onBack={onBack} />
+      <div className="px-5 mt-3 overflow-y-auto pb-8" style={{ height: "calc(100% - 56px)" }}>
+        <Card className="p-6 text-center" style={{ background: "linear-gradient(135deg,#0FB5A6 0%,#0D9488 100%)" }}>
+          <div style={{ color: "#CCFBF1", fontSize: 13 }}>رصيدك الحالي</div>
+          <div className="mt-1 flex items-baseline justify-center gap-1" style={{ color: "#FFF" }}>
+            <span style={{ fontFamily: "Inter", fontWeight: 800, fontSize: 40 }}>{CREDIT_BALANCE}</span>
+            <span style={{ fontSize: 16 }}>دينار</span>
+          </div>
+          <div style={{ color: "#CCFBF1", fontSize: 12 }} className="mt-2">يُخصم تلقائياً من فاتورتك القادمة</div>
+        </Card>
+
+        <Section title="السجل">
+          {empty ? (
+            <div className="text-center py-14">
+              <Wallet size={48} color="#CBD5E1" className="mx-auto" />
+              <p style={{ color: "#475569", fontSize: 14 }} className="mt-3">لا يوجد رصيد بعد</p>
+            </div>
+          ) : (
+            <Card className="overflow-hidden">
+              {history.map((h, i) => (
+                <div key={i} className="px-4 py-3.5 flex items-center gap-3 border-b last:border-0 border-slate-100">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: h.amount > 0 ? "#DCFCE7" : "#F1F5F9", color: h.amount > 0 ? "#15803D" : "#475569" }}>
+                    {h.amount > 0 ? <Gift size={16} /> : <CreditCard size={16} />}
+                  </div>
+                  <div className="flex-1">
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{h.reason}</div>
+                    <div style={{ color: "#94A3B8", fontSize: 11, fontFamily: "Inter" }}>{h.date}</div>
+                  </div>
+                  <span style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 15, color: h.amount > 0 ? "#15803D" : "#E5484D" }}>{h.amount > 0 ? "+" : ""}{h.amount} دينار</span>
+                </div>
+              ))}
+            </Card>
+          )}
+        </Section>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Video pre-check quotes ---------- */
+
+function VideoQuotes({ onBack, onNew, onAccept }: { onBack: () => void; onNew: () => void; onAccept: () => void }) {
+  const quotes = [
+    { id: "Q-31", svc: SERVICES[2], desc: "الوحدة لا تبرّد", status: "quoted" as const, price: 45 },
+    { id: "Q-28", svc: SERVICES[0], desc: "قاطع الكهرباء يفصل", status: "pending" as const },
+    { id: "Q-24", svc: SERVICES[1], desc: "تسريب من السخان", status: "accepted" as const, price: 40 },
+  ];
+  const label = { pending: ["بانتظار التسعير", "#FEF3C7", "#B45309"], quoted: ["مُسعّر", "#DCFCE7", "#15803D"], accepted: ["مقبول", "#DBEAFE", "#1366D6"] };
+  const empty = false;
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="الفحص المرئي" onBack={onBack} />
+      <div className="px-5 mt-3 overflow-y-auto pb-28" style={{ height: "calc(100% - 56px)" }}>
+        {empty ? (
+          <div className="text-center py-16">
+            <Video size={48} color="#CBD5E1" className="mx-auto" />
+            <p style={{ color: "#475569", fontSize: 14 }} className="mt-3">لا توجد طلبات تسعير بعد</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {quotes.map(q => {
+              const [txt, bg, fg] = label[q.status];
+              return (
+                <Card key={q.id} className="p-4">
+                  <div className="flex items-center gap-3">
+                    <ServiceIcon id={q.svc.id} size={20} />
+                    <div className="flex-1">
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{q.svc.ar}</div>
+                      <div style={{ color: "#475569", fontSize: 12 }}>«{q.desc}»</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full" style={{ background: bg, color: fg, fontSize: 11, fontWeight: 700 }}>{txt}</span>
+                  </div>
+                  {q.status === "quoted" && (
+                    <div className="mt-3 p-3 rounded-xl flex items-center justify-between" style={{ background: "#E8F1FE" }}>
+                      <div>
+                        <div style={{ color: "#0E4FA8", fontSize: 12 }}>السعر الثابت</div>
+                        <PriceBadge amount={q.price!} />
+                      </div>
+                      <button onClick={onAccept} className="px-4 h-10 rounded-xl" style={{ background: "#1366D6", color: "#FFF", fontWeight: 600, fontSize: 13 }}>اقبل واحجز</button>
+                    </div>
+                  )}
+                  {q.status === "accepted" && (
+                    <div className="mt-2" style={{ color: "#15803D", fontSize: 12, fontWeight: 600 }}>تم إنشاء الحجز بالسعر المتفق عليه · <span style={{ fontFamily: "Inter" }}>{q.price}</span> دينار</div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <FullCTA onClick={onNew} icon={<Plus size={18} />}>طلب تسعير جديد</FullCTA>
+    </div>
+  );
+}
+
+function VideoNewRequest({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const [svc, setSvc] = useState(SERVICES[0].id);
+  const launch = SERVICES.filter(s => isLaunch(s.id));
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="طلب تسعير جديد" onBack={onBack} />
+      <div className="px-5 mt-3 space-y-4 overflow-y-auto pb-32" style={{ height: "calc(100% - 56px)" }}>
+        <div>
+          <label style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>الخدمة</label>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {launch.map(s => (
+              <button key={s.id} onClick={() => setSvc(s.id)} className="text-start">
+                <Card className="p-3 flex flex-col items-center gap-1" style={{ borderColor: svc === s.id ? "#1366D6" : "transparent", borderWidth: 2 }}>
+                  <ServiceIcon id={s.id} size={20} />
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{s.ar}</span>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>فيديو المشكلة</label>
+          <button onClick={soon} className="mt-2 w-full aspect-video rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-2" style={{ color: "#7C3AED" }}>
+            <Video size={28} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>تسجيل / رفع فيديو</span>
+          </button>
+        </div>
+        <div>
+          <label style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>وصف المشكلة</label>
+          <textarea placeholder="اشرح المشكلة باختصار" className="w-full mt-2 rounded-xl border border-slate-200 px-4 py-3 outline-none resize-none" rows={3} style={{ fontSize: 14 }} />
+        </div>
+        <div className="flex items-center gap-2 p-3 rounded-xl border border-slate-200">
+          <MapPin size={18} color="#1366D6" />
+          <span style={{ fontSize: 14 }}>خلدا، شارع وصفي التل، عمارة 12، ط2</span>
+        </div>
+      </div>
+      <FullCTA onClick={() => { notify("تم إرسال طلب التسعير", "success"); onDone(); }}>طلب تسعير</FullCTA>
+    </div>
+  );
+}
+
+/* ---------- Referral ---------- */
+
+function Referral({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="h-full bg-white relative">
+      <TopBar title="ادعُ صديقاً" onBack={onBack} />
+      <div className="px-5 mt-3 text-center">
+        <div className="w-32 h-32 mx-auto rounded-full flex items-center justify-center" style={{ background: "#FEF3C7" }}>
+          <Gift size={64} color="#B45309" />
+        </div>
+        <h1 className="mt-5" style={{ fontWeight: 700, fontSize: 22 }}>ادعُ صديقاً</h1>
+        <p style={{ color: "#475569", fontSize: 14 }} className="mt-2">يحصل كلاكما على <span style={{ fontFamily: "Inter", fontWeight: 700 }}>5</span> دنانير رصيد خدمة عند أول حجز لصديقك.</p>
+        <Card className="mt-6 p-4 flex items-center gap-2">
+          <span className="flex-1 text-start" style={{ fontFamily: "Inter", fontWeight: 700, fontSize: 18, letterSpacing: 2 }}>AHMED5</span>
+          <button onClick={() => notify("تم نسخ رمز الدعوة", "success")} style={{ color: "#1366D6", fontWeight: 600, fontSize: 13 }}>نسخ</button>
+        </Card>
+      </div>
+      <FullCTA onClick={() => notify("فتح مشاركة الدعوة…")}>مشاركة رمز الدعوة</FullCTA>
     </div>
   );
 }

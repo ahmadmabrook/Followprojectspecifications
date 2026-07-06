@@ -23,13 +23,18 @@ export const SERVICES = [
 export type ServiceId = typeof SERVICES[number]["id"];
 
 export const STATUS = {
+  awaiting_payment:     { ar: "بانتظار الدفع",       bg: "#E2E8F0", fg: "#475569" },
   pending:              { ar: "بانتظار الدفع",       bg: "#E2E8F0", fg: "#475569" },
   searching:            { ar: "جارٍ البحث عن فني",   bg: "#DBEAFE", fg: "#1366D6" },
+  en_route:             { ar: "الفني في الطريق",     bg: "#CCFBF1", fg: "#0F766E" },
+  confirmed:            { ar: "تم القبول",           bg: "#DBEAFE", fg: "#1366D6" },
   accepted:             { ar: "تم القبول",           bg: "#DBEAFE", fg: "#1366D6" },
   technician_arriving:  { ar: "الفني في الطريق",     bg: "#CCFBF1", fg: "#0F766E" },
+  arrived:              { ar: "الفني وصل",           bg: "#CCFBF1", fg: "#0F766E" },
   in_progress:          { ar: "الخدمة جارية",        bg: "#FEF3C7", fg: "#B45309" },
   completed:            { ar: "مكتملة",              bg: "#DCFCE7", fg: "#15803D" },
   cancelled:            { ar: "ملغاة",               bg: "#FEE2E2", fg: "#B91C1C" },
+  disputed:             { ar: "نزاع",                bg: "#FEE2E2", fg: "#B91C1C" },
   expired:              { ar: "منتهية",              bg: "#E2E8F0", fg: "#475569" },
 } as const;
 
