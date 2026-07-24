@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Smartphone, Wrench, Monitor, Settings, Palette } from "lucide-react";
+import { Smartphone, Wrench, Monitor, Settings, Palette, Moon, Sun } from "lucide-react";
 import { Toaster } from "sonner";
 import DesignSystem from "./components/fixly/DesignSystem";
 import CustomerMobile from "./components/fixly/CustomerMobile";
@@ -19,9 +19,10 @@ const PRODUCTS: { id: Product; ar: string; en: string; Icon: any; tag?: string }
 
 export default function App() {
   const [product, setProduct] = useState<Product>("customer-mobile");
+  const [dark, setDark] = useState(false);
 
   return (
-    <div className="size-full flex flex-col" style={{ background: "#EEF2F7", fontFamily: "'Inter','Tajawal',sans-serif" }}>
+    <div className={`${dark ? "dark" : ""} size-full flex flex-col bg-background text-foreground`} style={{ fontFamily: "'Inter','Tajawal',sans-serif" }}>
       <Toaster position="top-center" richColors closeButton />
       {/* Top shell */}
       <header className="bg-white border-b border-slate-200 shrink-0">
@@ -37,6 +38,9 @@ export default function App() {
           </div>
 
           <div className="flex-1" />
+          <button onClick={() => setDark(v => !v)} aria-label="تبديل المظهر" className="w-9 h-9 rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-700 dark:bg-slate-800" style={{ color: "#1366D6" }}>
+            {dark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
 
           <nav className="flex items-center gap-1.5 overflow-x-auto">
             {PRODUCTS.map(p => {
